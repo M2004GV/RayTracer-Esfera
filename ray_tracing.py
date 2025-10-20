@@ -4,7 +4,7 @@ import pandas as pd
 
 ## Configuração do cenário
 # Imagem
-width, height = 500, 500
+width, height = 5, 5
 aspect = width / height  
 
 # Câmera 
