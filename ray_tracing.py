@@ -4,12 +4,12 @@ import pandas as pd
 
 ## Configuração do cenário
 # Imagem
-width, height = 5, 5
+width, height = 500, 500
 aspect = width / height  
 
 # Câmera 
 eye = np.array([-10.0, 0.0, 0.0])
-df = 10.0                   # distância focal
+df = 15.0                   # distância focal
 fov_deg = 90.0
 half = df * np.tan(np.deg2rad(fov_deg * 0.5))  # 10.0
 plane_size_y = 2 * half  # 20.0 (largura em y)
@@ -26,6 +26,7 @@ raio_esfera = 2.0
 def normalize(v):
     n = np.linalg.norm(v) # calcula a norma do vetor [sqrt(x**x+y**y+z**z)]
     return (v/n) if n > 0 else v
+
 
 # Interseção raio-esfera
 # (d*d)t^2 + 2(d*(e-c))t + ((e-c)*(e-c)-r^2) = 0
@@ -79,7 +80,7 @@ def intersect_esfera(origem, direcao, centro, raio):
         return None
 
 
-def intensidade_phong(ponto_intersecao, normal, direcao_camera):
+def intensidade_phong(ponto_intersecao, normal, direcao_camera, modo='completo'):
     """
     Calcula a intensidade de iluminação Phong no ponto de interseção.
     
@@ -89,6 +90,7 @@ def intensidade_phong(ponto_intersecao, normal, direcao_camera):
     - ponto_intersecao: ponto na superfície da esfera
     - normal: vetor normal à superfície no ponto
     - direcao_camera: direção do raio (da câmera ao ponto)
+    - modo: 'ambiente', 'difuso', 'especular' ou 'completo'
     
     Retorna:
     - intensidade (float): valor entre 0 e 1
@@ -103,17 +105,20 @@ def intensidade_phong(ponto_intersecao, normal, direcao_camera):
     k_especular = 0.3   # coeficiente especular
     n_brilho = 32       # expoente de brilho especular
     
-    # Componente ambiente
+    # ========== SOMBREAMENTO: COMPONENTE AMBIENTE ==========
+    # Iluminação base constante (não depende de posição da luz)
     I_ambiente = k_ambiente
     
+    # ========== SOMBREAMENTO: COMPONENTE DIFUSA ==========
     # Vetor da superfície à luz (L)
     L = normalize(luz_pos - ponto_intersecao)
     
     # Componente difusa: I_d = k_d * (N · L)
+    # Depende do ângulo entre a normal e a direção da luz
     NdotL = max(0, np.dot(normal, L))
     I_difusa = k_difusa * luz_intensidade * NdotL
     
-    # Componente especular (reflexão)
+    # ========== SOMBREAMENTO: COMPONENTE ESPECULAR ==========
     # Vetor de visão (V) - direção da câmera (oposta à direção do raio)
     V = normalize(-direcao_camera)
     
@@ -122,11 +127,19 @@ def intensidade_phong(ponto_intersecao, normal, direcao_camera):
     R = normalize(R)
     
     # I_s = k_s * (R · V)^n
+    # Cria o brilho especular (highlight)
     RdotV = max(0, np.dot(R, V))
     I_especular = k_especular * luz_intensidade * (RdotV ** n_brilho)
     
-    # Intensidade total
-    intensidade = I_ambiente + I_difusa + I_especular
+    # Retorna componente específica ou todas combinadas
+    if modo == 'ambiente':
+        intensidade = I_ambiente
+    elif modo == 'difuso':
+        intensidade = I_ambiente + I_difusa
+    elif modo == 'especular':
+        intensidade = I_ambiente + I_especular
+    else:  # 'completo'
+        intensidade = I_ambiente + I_difusa + I_especular
     
     # Limita o valor entre 0 e 1
     return min(1.0, max(0.0, intensidade))
@@ -361,7 +374,7 @@ def gerar_planilha_calculos():
         
     return dataframe
 
-def renderizar():
+def renderizar(modo='completo'):
     """
     Renderiza a cena completa, gerando uma imagem do plano de projeção.
 
@@ -371,17 +384,10 @@ def renderizar():
     # Cria a imagem (matriz de pixels)
     imagem = np.zeros((height, width))
     
-    print("Renderizando cena...")
-    print(f"Resolução: {width}x{height} pixels")
-    print(f"Câmera em: {eye}")
-    print(f"Distância focal: {df}")
-    print(f"FOV: {fov_deg}°")
-    print(f"Esfera: centro={centro_esfera}, raio={raio_esfera}")
-    print()
-    
     # Para cada pixel da imagem
     for i in range(height):
         for j in range(width):
+            # ========== ETAPA 1: GERAÇÃO DOS RAIOS ==========
             # Calcula a posição do pixel no plano de projeção
             # Plano de projeção está em x = eye_x + df = 0
             # Centro do plano está em (0, 0, 0)
@@ -395,9 +401,10 @@ def renderizar():
             # Ponto no plano de projeção
             pixel_pos = np.array([eye[0] + df, pixel_y, pixel_z])
             
-            # Direção do raio: da câmera ao pixel
+            # Direção do raio: da câmera ao pixel (normalizado)
             direcao_raio = normalize(pixel_pos - eye)
             
+            # ========== ETAPA 2: INTERSEÇÃO RAIO-OBJETO ==========
             # Verifica interseção com a esfera
             t = intersect_esfera(eye, direcao_raio, centro_esfera, raio_esfera)
             
@@ -408,8 +415,9 @@ def renderizar():
                 # Normal à superfície (aponta para fora da esfera)
                 normal = normalize(ponto - centro_esfera)
                 
-                # Calcula a intensidade usando Phong
-                intensidade = intensidade_phong(ponto, normal, direcao_raio)
+                # ========== ETAPA 3: SOMBREAMENTO ==========
+                # Calcula a intensidade usando modelo Phong
+                intensidade = intensidade_phong(ponto, normal, direcao_raio, modo)
                 
                 # Armazena o valor do pixel
                 imagem[i, j] = intensidade
@@ -417,13 +425,19 @@ def renderizar():
                 # Sem interseção - pixel preto (fundo)
                 imagem[i, j] = 0.0
     
-    print("Renderização concluída!")
     return imagem
 
 
 if __name__ == "__main__":
-    # Renderiza a cena
-    imagem = renderizar()
+    print("="*60)
+    print("RAY TRACING - RENDERIZANDO ESFERA COM ILUMINAÇÃO PHONG")
+    print("="*60)
+    print(f"Resolução: {width}x{height} pixels")
+    print(f"Câmera em: {eye}")
+    print(f"Distância focal: {df}")
+    print(f"FOV: {fov_deg}°")
+    print(f"Esfera: centro={centro_esfera}, raio={raio_esfera}")
+    print()
     
     # Renderiza as 3 componentes do sombreamento + completo
     imagem_ambiente = renderizar(modo='ambiente')
@@ -431,7 +445,7 @@ if __name__ == "__main__":
     imagem_especular = renderizar(modo='especular')
     imagem_completo = renderizar(modo='completo')
     
-    # Gera a planilha com os cálculos detalhados
+    # GERA A PLANILHA COM OS CÁLCULOS DETALHADOS
     df_calculos = gerar_planilha_calculos()
 
     # Cria figura com 4 subplots (3 componentes + completo)
@@ -461,9 +475,8 @@ if __name__ == "__main__":
                  fontsize=14, fontweight='bold', y=0.98)
     plt.tight_layout()
     
-    # Salva a imagem
-    plt.savefig('raytracing_esfera.png', dpi=150, bbox_inches='tight')
-    print("\nImagem salva como 'raytracing_esfera.png'")
+    # Salva a imagem comparativa
+    plt.savefig('raytracing_phong_completo.png', dpi=150, bbox_inches='tight')
     
     # Salvar apenas a imagem completa
     # plt.figure(figsize=(8, 8))
@@ -474,10 +487,11 @@ if __name__ == "__main__":
     # plt.tight_layout()
     # plt.savefig('raytracing_esfera.png', dpi=150, bbox_inches='tight') # Salva imagem
     
+    # Mostra as imagens
     plt.show()
     
     print("\n" + "="*60)
-    print("EXERCÍCIO - Experimente alterar os parâmetros:")
+    print("ETAPAS DO RAY TRACING IMPLEMENTADAS:")
     print("="*60)
     print("1. GERAÇÃO DOS RAIOS:")
     print("   - Calcula posição de cada pixel no plano de projeção")
