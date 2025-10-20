@@ -9,7 +9,7 @@ aspect = width / height
 
 # Câmera 
 eye = np.array([-10.0, 0.0, 0.0])
-df = 15.0                   # distância focal
+df = 10.0                   # distância focal
 fov_deg = 90.0
 half = df * np.tan(np.deg2rad(fov_deg * 0.5))  # 10.0
 plane_size_y = 2 * half  # 20.0 (largura em y)
