@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+import pandas as pd
 
 ## Configuração do cenário
 # Imagem
@@ -26,10 +26,6 @@ raio_esfera = 2.0
 def normalize(v):
     n = np.linalg.norm(v) # calcula a norma do vetor [sqrt(x**x+y**y+z**z)]
     return (v/n) if n > 0 else v
-
-
-# funções principais
-
 
 # Interseção raio-esfera
 # (d*d)t^2 + 2(d*(e-c))t + ((e-c)*(e-c)-r^2) = 0
@@ -135,17 +131,242 @@ def intensidade_phong(ponto_intersecao, normal, direcao_camera):
     # Limita o valor entre 0 e 1
     return min(1.0, max(0.0, intensidade))
 
+def gerar_planilha_calculos():
+    print("\n" + "="*60)
+    print("GERANDO PLANILHA COM CÁLCULOS DETALHADOS...")
+    print("="*60)
+    
+    dados = []
+        
+    # Para cada pixel da imagem
+    for i in range(height):
+        for j in range(width):
+            pixel_info = {
+                'Pixel_Row': i,
+                'Pixel_Col': j,
+                'Pixel_Index': i * width + j + 1
+            }
+                
+            # ========== ETAPA 1: GERAÇÃO DOS RAIOS ==========
+            pixel_y = -half + (j + 0.5) * pixel_size_y
+            pixel_z = half - (i + 0.5) * pixel_size_z
+            pixel_pos = np.array([eye[0] + df, pixel_y, pixel_z])
+            direcao_raio = normalize(pixel_pos - eye)
+                
+            pixel_info['Pixel_X'] = pixel_pos[0]
+            pixel_info['Pixel_Y'] = pixel_pos[1]
+            pixel_info['Pixel_Z'] = pixel_pos[2]
+            pixel_info['Raio_Dir_X'] = direcao_raio[0]
+            pixel_info['Raio_Dir_Y'] = direcao_raio[1]
+            pixel_info['Raio_Dir_Z'] = direcao_raio[2]
+                
+            # ========== ETAPA 2: INTERSEÇÃO RAIO-OBJETO ==========
+            oc = eye - centro_esfera
+            a = np.dot(direcao_raio, direcao_raio)
+            b = 2.0 * np.dot(direcao_raio, oc)
+            c = np.dot(oc, oc) - raio_esfera**2
+            delta = b**2 - 4*a*c
+                
+            pixel_info['Coef_a'] = a
+            pixel_info['Coef_b'] = b
+            pixel_info['Coef_c'] = c
+            pixel_info['Delta'] = delta
+                
+            # Calcula t (distância de interseção)
+            if delta < 0:
+                t = None
+                pixel_info['Intersecao'] = 'Não'
+                pixel_info['t'] = 'N/A'
+                pixel_info['Ponto_X'] = 'N/A'
+                pixel_info['Ponto_Y'] = 'N/A'
+                pixel_info['Ponto_Z'] = 'N/A'
+                pixel_info['Normal_X'] = 'N/A'
+                pixel_info['Normal_Y'] = 'N/A'
+                pixel_info['Normal_Z'] = 'N/A'
+                pixel_info['I_Ambiente'] = 0.0
+                pixel_info['I_Difusa'] = 0.0
+                pixel_info['I_Especular'] = 0.0
+                pixel_info['I_Total'] = 0.0
+                pixel_info['Luz_X'] = 'N/A'
+                pixel_info['Luz_Y'] = 'N/A'
+                pixel_info['Luz_Z'] = 'N/A'
+                pixel_info['L_X'] = 'N/A'
+                pixel_info['L_Y'] = 'N/A'
+                pixel_info['L_Z'] = 'N/A'
+                pixel_info['NdotL'] = 'N/A'
+                pixel_info['V_X'] = 'N/A'
+                pixel_info['V_Y'] = 'N/A'
+                pixel_info['V_Z'] = 'N/A'
+                pixel_info['R_X'] = 'N/A'
+                pixel_info['R_Y'] = 'N/A'
+                pixel_info['R_Z'] = 'N/A'
+                pixel_info['RdotV'] = 'N/A'
+                pixel_info['RdotV_elevado'] = 'N/A'
+            else:
+                sqrt_delta = np.sqrt(delta)
+                t1 = (-b - sqrt_delta) / (2*a)
+                t2 = (-b + sqrt_delta) / (2*a)
+                    
+                if t1 > 0:
+                    t = t1
+                elif t2 > 0:
+                    t = t2
+                else:
+                    t = None
+                    
+                if t is not None:
+                    pixel_info['Intersecao'] = 'Sim'
+                    pixel_info['t'] = t
+                        
+                    # Ponto de interseção
+                    ponto = eye + t * direcao_raio
+                    pixel_info['Ponto_X'] = ponto[0]
+                    pixel_info['Ponto_Y'] = ponto[1]
+                    pixel_info['Ponto_Z'] = ponto[2]
+                        
+                    # Normal
+                    normal = normalize(ponto - centro_esfera)
+                    pixel_info['Normal_X'] = normal[0]
+                    pixel_info['Normal_Y'] = normal[1]
+                    pixel_info['Normal_Z'] = normal[2]
+                        
+                    # ========== ETAPA 3: SOMBREAMENTO ==========
+                    luz_pos = np.array([-5.0, 5.0, 5.0])
+                    luz_intensidade = 1.0
+                    k_ambiente = 0.1
+                    k_difusa = 0.6
+                    k_especular = 0.3
+                    n_brilho = 32
+                        
+                    # Componente Ambiente (iluminação base constante)
+                    I_ambiente = k_ambiente
+                    
+                    # Componente Difusa (baseada no ângulo entre normal e luz)
+                    L = normalize(luz_pos - ponto)
+                    NdotL = max(0, np.dot(normal, L))
+                    I_difusa = k_difusa * luz_intensidade * NdotL
+                    
+                    # Componente Especular (reflexo brilhante)
+                    V = normalize(-direcao_raio)
+                    R = 2 * np.dot(normal, L) * normal - L
+                    R = normalize(R)
+                    RdotV = max(0, np.dot(R, V))
+                    I_especular = k_especular * luz_intensidade * (RdotV ** n_brilho)
+                    
+                    # Intensidade total
+                    I_total = I_ambiente + I_difusa + I_especular
+                    
+                    # Salva as componentes INDIVIDUAIS
+                    pixel_info['I_Ambiente'] = I_ambiente
+                    pixel_info['I_Difusa'] = I_difusa
+                    pixel_info['I_Especular'] = I_especular
+                    pixel_info['I_Total'] = min(1.0, I_total)
+                    
+                    # Cálculos intermediários adicionais
+                    pixel_info['Luz_X'] = luz_pos[0]
+                    pixel_info['Luz_Y'] = luz_pos[1]
+                    pixel_info['Luz_Z'] = luz_pos[2]
+                    pixel_info['L_X'] = L[0]
+                    pixel_info['L_Y'] = L[1]
+                    pixel_info['L_Z'] = L[2]
+                    pixel_info['NdotL'] = NdotL
+                    pixel_info['V_X'] = V[0]
+                    pixel_info['V_Y'] = V[1]
+                    pixel_info['V_Z'] = V[2]
+                    pixel_info['R_X'] = R[0]
+                    pixel_info['R_Y'] = R[1]
+                    pixel_info['R_Z'] = R[2]
+                    pixel_info['RdotV'] = RdotV
+                    pixel_info['RdotV_elevado'] = RdotV ** n_brilho
+                else:
+                    pixel_info['Intersecao'] = 'Não'
+                    pixel_info['t'] = 'N/A'
+                    pixel_info['Ponto_X'] = 'N/A'
+                    pixel_info['Ponto_Y'] = 'N/A'
+                    pixel_info['Ponto_Z'] = 'N/A'
+                    pixel_info['Normal_X'] = 'N/A'
+                    pixel_info['Normal_Y'] = 'N/A'
+                    pixel_info['Normal_Z'] = 'N/A'
+                    pixel_info['I_Ambiente'] = 0.0
+                    pixel_info['I_Difusa'] = 0.0
+                    pixel_info['I_Especular'] = 0.0
+                    pixel_info['I_Total'] = 0.0
+                    pixel_info['Luz_X'] = 'N/A'
+                    pixel_info['Luz_Y'] = 'N/A'
+                    pixel_info['Luz_Z'] = 'N/A'
+                    pixel_info['L_X'] = 'N/A'
+                    pixel_info['L_Y'] = 'N/A'
+                    pixel_info['L_Z'] = 'N/A'
+                    pixel_info['NdotL'] = 'N/A'
+                    pixel_info['V_X'] = 'N/A'
+                    pixel_info['V_Y'] = 'N/A'
+                    pixel_info['V_Z'] = 'N/A'
+                    pixel_info['R_X'] = 'N/A'
+                    pixel_info['R_Y'] = 'N/A'
+                    pixel_info['R_Z'] = 'N/A'
+                    pixel_info['RdotV'] = 'N/A'
+                    pixel_info['RdotV_elevado'] = 'N/A'
+                
+            dados.append(pixel_info)
+        
+    # Cria DataFrame
+    dataframe = pd.DataFrame(dados)
+        
+    # Reorganiza as colunas para melhor visualização
+    colunas_ordenadas = [
+        'Pixel_Index', 'Pixel_Row', 'Pixel_Col',
+        'Pixel_X', 'Pixel_Y', 'Pixel_Z',
+        'Raio_Dir_X', 'Raio_Dir_Y', 'Raio_Dir_Z',
+        'Coef_a', 'Coef_b', 'Coef_c', 'Delta',
+        'Intersecao', 't',
+        'Ponto_X', 'Ponto_Y', 'Ponto_Z',
+        'Normal_X', 'Normal_Y', 'Normal_Z',
+        'Luz_X', 'Luz_Y', 'Luz_Z',
+        'L_X', 'L_Y', 'L_Z', 'NdotL',
+        'V_X', 'V_Y', 'V_Z',
+        'R_X', 'R_Y', 'R_Z', 'RdotV', 'RdotV_elevado',
+        'I_Ambiente', 'I_Difusa', 'I_Especular', 'I_Total'
+    ]
+    dataframe = dataframe[colunas_ordenadas]
+        
+    # Salva em Excel com nome único para evitar conflito de arquivo aberto
+    import datetime
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    nome_arquivo = f'raytracing_calculos_detalhados_{timestamp}.xlsx'
+        
+    with pd.ExcelWriter(nome_arquivo, engine='openpyxl') as writer:
+        dataframe.to_excel(writer, sheet_name='Cálculos Completos', index=False)
+            
+        # Cria uma planilha resumida apenas com pixels que intersectam
+        df_intersecoes = dataframe[dataframe['Intersecao'] == 'Sim'].copy()
+        df_intersecoes.to_excel(writer, sheet_name='Apenas Interseções', index=False)
+            
+        # Cria planilha com resumo estatístico
+        resumo = {
+            'Total de Pixels': [len(dataframe)],
+            'Pixels com Interseção': [len(df_intersecoes)],
+            'Pixels sem Interseção': [len(dataframe) - len(df_intersecoes)],
+            'Intensidade Média': [df_intersecoes['I_Total'].mean() if len(df_intersecoes) > 0 else 0],
+            'Intensidade Mínima': [df_intersecoes['I_Total'].min() if len(df_intersecoes) > 0 else 0],
+            'Intensidade Máxima': [df_intersecoes['I_Total'].max() if len(df_intersecoes) > 0 else 0]
+        }
+        df_resumo = pd.DataFrame(resumo)
+        df_resumo.to_excel(writer, sheet_name='Resumo', index=False)
+        
+    print(f"✓ Planilha salva: {nome_arquivo}")
+    print(f"✓ Total de pixels analisados: {len(dataframe)}")
+    print(f"✓ Pixels com interseção: {len(df_intersecoes)}")
+    print(f"✓ Planilhas criadas:")
+    print("="*60)
+        
+    return dataframe
 
 def renderizar():
     """
     Renderiza a cena completa, gerando uma imagem do plano de projeção.
-    
-    Para cada pixel:
-    1. Calcula a posição do pixel no plano de projeção
-    2. Cria um raio da câmera passando pelo pixel
-    3. Verifica interseção com a esfera
-    4. Calcula a iluminação Phong se houver interseção
-    5. Armazena a cor do pixel
+
+    Parâmetros:
+    - modo: tipo de sombreamento ('ambiente', 'difuso', 'especular', 'completo')
     """
     # Cria a imagem (matriz de pixels)
     imagem = np.zeros((height, width))
@@ -204,35 +425,70 @@ if __name__ == "__main__":
     # Renderiza a cena
     imagem = renderizar()
     
-    # Exibe a imagem
-    plt.figure(figsize=(8, 8))
-    plt.imshow(imagem, cmap='gray', vmin=0, vmax=1)
-    plt.title(f'Ray Tracing - Esfera\nResolução: {width}x{height}, FOV: {fov_deg}°, Distância Focal: {df}')
-    plt.colorbar(label='Intensidade')
-    plt.xlabel('X (pixels)')
-    plt.ylabel('Y (pixels)')
+    # Renderiza as 3 componentes do sombreamento + completo
+    imagem_ambiente = renderizar(modo='ambiente')
+    imagem_difuso = renderizar(modo='difuso')
+    imagem_especular = renderizar(modo='especular')
+    imagem_completo = renderizar(modo='completo')
+    
+    # Gera a planilha com os cálculos detalhados
+    df_calculos = gerar_planilha_calculos()
+
+    # Cria figura com 4 subplots (3 componentes + completo)
+    fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    
+    # Componente Ambiente
+    axes[0, 0].imshow(imagem_ambiente, cmap='gray', vmin=0, vmax=1)
+    axes[0, 0].set_title('Ambiente\n(Iluminação Base)', fontsize=10, fontweight='bold')
+    axes[0, 0].axis('off')
+    
+    # Componente Difuso
+    axes[0, 1].imshow(imagem_difuso, cmap='gray', vmin=0, vmax=1)
+    axes[0, 1].set_title('Difuso\n(Ambiente + Difusa)', fontsize=10, fontweight='bold')
+    axes[0, 1].axis('off')
+    
+    # Componente Especular
+    axes[1, 0].imshow(imagem_especular, cmap='gray', vmin=0, vmax=1)
+    axes[1, 0].set_title('Especular\n(Ambiente + Especular)', fontsize=10, fontweight='bold')
+    axes[1, 0].axis('off')
+    
+    # Phong Completo
+    axes[1, 1].imshow(imagem_completo, cmap='gray', vmin=0, vmax=1)
+    axes[1, 1].set_title('Phong Completo\n(Ambiente + Difusa + Especular)', fontsize=10, fontweight='bold')
+    axes[1, 1].axis('off')
+    
+    plt.suptitle(f'Ray Tracing - Modelo de Iluminação Phong\nResolução: {width}x{height}, FOV: {fov_deg}°, df: {df}', 
+                 fontsize=14, fontweight='bold', y=0.98)
     plt.tight_layout()
     
     # Salva a imagem
     plt.savefig('raytracing_esfera.png', dpi=150, bbox_inches='tight')
     print("\nImagem salva como 'raytracing_esfera.png'")
     
-    # Mostra a imagem
+    # Salvar apenas a imagem completa
+    # plt.figure(figsize=(8, 8))
+    # plt.imshow(imagem_completo, cmap='gray', vmin=0, vmax=1)
+    # plt.title(f'Ray Tracing - Esfera (Phong Completo)\nResolução: {width}x{height}, FOV: {fov_deg}°, df: {df}')
+    # plt.colorbar(label='Intensidade')
+    # plt.axis('off')
+    # plt.tight_layout()
+    # plt.savefig('raytracing_esfera.png', dpi=150, bbox_inches='tight') # Salva imagem
+    
     plt.show()
     
     print("\n" + "="*60)
     print("EXERCÍCIO - Experimente alterar os parâmetros:")
     print("="*60)
-    print("a) Distância focal (df): Altere o valor na linha 12")
-    print("   - df menor = objeto parece maior")
-    print("   - df maior = objeto parece menor")
+    print("1. GERAÇÃO DOS RAIOS:")
+    print("   - Calcula posição de cada pixel no plano de projeção")
+    print("   - Cria raio da câmera passando pelo pixel")
     print()
-    print("b) Campo de visão (fov_deg): Altere o valor na linha 13")
-    print("   - FOV menor = zoom (visão mais estreita)")
-    print("   - FOV maior = wide angle (visão mais ampla)")
+    print("2. INTERSEÇÃO RAIO-OBJETO:")
+    print("   - Resolve equação quadrática raio-esfera")
+    print("   - Encontra ponto de interseção mais próximo")
     print()
-    print("Sugestões para testar:")
-    print("  - df = 5.0 ou df = 20.0")
-    print("  - fov_deg = 45.0 ou fov_deg = 120.0")
-    print("  - width, height = 100, 100 (para imagem maior)")
+    print("3. SOMBREAMENTO (Modelo Phong):")
+    print("   - Componente Ambiente: iluminação base constante")
+    print("   - Componente Difusa: depende do ângulo luz-normal")
+    print("   - Componente Especular: cria reflexo brilhante")
     print("="*60)
