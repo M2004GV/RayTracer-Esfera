@@ -4,13 +4,13 @@ import pandas as pd
 
 ## Configuração do cenário
 # Imagem
-width, height = 5, 5
+width, height = 500, 500 # Alterado de 5, 5 para 500, 500 para testes
 aspect = width / height  
 
 # Câmera 
 eye = np.array([-10.0, 0.0, 0.0])
 df = 10.0                   # distância focal
-fov_deg = 90.0
+fov_deg = 60.0              # Alterado de 90 para 60 para testes
 half = df * np.tan(np.deg2rad(fov_deg * 0.5))  # 10.0
 plane_size_y = 2 * half  # 20.0 (largura em y)
 plane_size_z = 2 * half  # 20.0 (altura em z)

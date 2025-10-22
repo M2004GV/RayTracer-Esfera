@@ -146,6 +146,126 @@ Com **250.000 pixels** totais, a diferença é notável:
 
 ---
 
+## 🔬 Testes de Parâmetros da Câmera
+
+### **Teste 3: Aproximação da Câmera (eye = 0, 0, 0) com FOV = 90°**
+
+#### Parâmetros
+```python
+eye = np.array([0.0, 0.0, 0.0])
+df = 10.0
+fov_deg = 90.0
+width, height = 500, 500
+```
+
+#### Objetivo
+Demonstrar o efeito de aproximar a câmera do objeto, movendo-a de `(-10, 0, 0)` para `(0, 0, 0)`.
+
+#### Resultados Visuais
+![Câmera em (0, 0, 0) - FOV 90°](/Testes/Figure_eye_000.png)
+
+**Efeito observado:**
+- A esfera mantém tamanho similar ao Teste 2
+- Distância câmera→esfera reduzida de **15 unidades** para **5 unidades**
+- O plano de projeção agora está em `x = 10` (atrás da esfera!)
+- Visualização mantém proporção devido ao FOV constante
+
+#### Estatísticas da Renderização
+
+| Métrica | Valor |
+|---------|-------|
+| **Total de Pixels** | 250.000 |
+| **Pixels com Interseção** | 3.560 (~1,4% da imagem) |
+| **Pixels sem Interseção** | 246.440 (fundo preto) |
+| **Intensidade Média** | 0,413761347 |
+| **Intensidade Mínima** | 0,1 (componente ambiente) |
+| **Intensidade Máxima** | 0,96194244 |
+
+**Comparação com Teste 2:**
+- **Mesmo número de pixels** com interseção (3.560)
+- Intensidades praticamente idênticas
+- A esfera ocupa **1,4%** da imagem (igual ao Teste 2)
+- Posição da câmera não afeta proporção devido ao sistema FOV vinculado
+
+---
+
+### **Teste 4: Zoom com FOV Reduzido (eye = 0, 0, 0 + FOV = 60°)**
+
+#### Parâmetros
+```python
+eye = np.array([0.0, 0.0, 0.0])
+df = 10.0
+fov_deg = 60.0  # REDUZIDO de 90° para 60°
+width, height = 500, 500
+```
+
+#### Objetivo
+Demonstrar o efeito de "zoom" ao reduzir o campo de visão (FOV), mantendo a câmera na mesma posição.
+
+#### Resultados Visuais
+![Câmera em (0, 0, 0) - FOV 60°](/Testes/Figure_eye_000_fov_60.png)
+
+**Efeito observado:**
+- A esfera **ocupa quase metade da imagem** (~45% da área)
+- FOV menor = campo de visão mais estreito = efeito de "zoom in"
+- Com FOV=60°, o plano é menor (~11,5x11,5 vs 20x20 com FOV=90°)
+- Esfera aparece muito maior e detalhada
+
+#### Estatísticas da Renderização
+
+| Métrica | Valor |
+|---------|-------|
+| **Total de Pixels** | 250.000 |
+| **Pixels com Interseção** | 112.224 (~45% da imagem) |
+| **Pixels sem Interseção** | 137.776 (fundo preto) |
+| **Intensidade Média** | 0,461705987 |
+| **Intensidade Mínima** | 0,1 (componente ambiente) |
+| **Intensidade Máxima** | 0,947330796 |
+
+**Comparação com Teste 3:**
+- **31,5x mais pixels** com interseção (112.224 vs 3.560)
+- Intensidade média **11,5% maior** (0,46 vs 0,41)
+- Esfera ocupa **45%** da imagem vs **1,4%** no Teste 3
+- Efeito dramático de zoom apenas alterando FOV!
+
+---
+
+## 🎛️ Efeito da Distância Focal (df)
+
+### Por que alterar `df` não produz diferença visual aparente?
+
+Ao modificar a distância focal mantendo o FOV vinculado, ocorre um fenômeno de compensação:
+
+#### **O que acontece matematicamente:**
+
+**Com `df = 10.0`:**
+- `half = 10 × tan(45°) = 10.0`
+- Plano em `x = -10 + 10 = 0`
+- Tamanho do plano: **20×20** unidades
+
+**Com `df = 5.0`:**
+- `half = 5 × tan(45°) = 5.0`
+- Plano em `x = -10 + 5 = -5`
+- Tamanho do plano: **10×10** unidades
+
+**Com `df = 15.0`:**
+- `half = 15 × tan(45°) = 15.0`
+- Plano em `x = -10 + 15 = 5`
+- Tamanho do plano: **30×30** unidades
+
+#### **Por que não vemos diferença visual?**
+
+Embora o plano mude de posição e tamanho, a esfera é capturada proporcionalmente porque:
+
+1. **O campo de visão (FOV) está vinculado ao `df`** pela fórmula: `half = df × tan(FOV/2)`
+2. **Quando `df` diminui**: o plano fica menor, **mas também mais próximo**
+3. **Quando `df` aumenta**: o plano fica maior, **mas também mais distante**
+4. **A proporção angular se mantém similar!**
+
+**Conclusão**: No sistema atual, **alterar a posição da câmera (`eye`)** ou **alterar o FOV** produz efeitos visuais mais evidentes do que alterar apenas `df`.
+
+---
+
 ## 🎯 Conclusões
 
 O projeto demonstra com sucesso os princípios fundamentais do ray tracing:
