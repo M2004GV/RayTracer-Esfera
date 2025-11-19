@@ -10,5 +10,5 @@
 ### Compilação usando o MSYS2 / MinGW64
 
 ```bash
-    g++ src/main.cpp -o main.exe -lfreeglut -lopengl32 -lglu32 -lgdi32
+    g++ cenario_montanha.cpp -o cenario_montanha.exe -lfreeglut -lopengl32 -lglu32 -lglew32 -lm
 ```
