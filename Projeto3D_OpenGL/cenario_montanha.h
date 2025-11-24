@@ -40,10 +40,23 @@ extern const int TERRAIN_SIZE;
 extern const float HEIGHT_SCALE;
 extern const float MAX_HEIGHT;
 extern const float WATER_HEIGHT;
+extern const float WATER_SIZE;
 
 // textura / splatting heights
 extern const float SNOW_HEIGHT_START;
 extern const float ROCK_HEIGHT_START;
+
+// ---------------------
+// nuvens
+// ---------------------
+struct Cloud {
+    float x, y, z;
+    float radius;
+    float speedX, speedZ;
+};
+
+extern const int NUM_CLOUDS;
+extern std::vector<Cloud> clouds;
 
 // funções
 void calculateDirectionVectors();
@@ -54,3 +67,7 @@ void applyHeightColor(float height, float maxHeight);
 void drawProceduralMountain(float centerX, float centerZ, float radius);
 void drawWaterPlane(bool isReflectionPass);
 void renderMountains();
+void initClouds();
+void updateClouds(float deltaTime);
+void drawCloud(const Cloud& cloud);
+void renderClouds();
