@@ -138,7 +138,7 @@ void applyHeightColor(float height, float maxHeight) {
 
 // geração de geometria do terreno
 void drawProceduralMountain(float centerX, float centerZ, float radius) {
-    const float step = 0.5f; // era 1.0f - mais triângulos = mais detalhes
+    const float step = 0.5f;
 
     float startX = floorf(centerX - radius) - 1.0f;
     float endX   = ceilf(centerX + radius)  + 1.0f;
@@ -355,6 +355,8 @@ void renderClouds() {
     glDisable(GL_BLEND);
 }
 
+/* VERSÃO SEM REFLEXÃO DAS MONTANHAS NA ÁGUA
+
 void display(){
     // atualiza tempo
     double currentTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
@@ -381,6 +383,75 @@ void display(){
     renderClouds();
 
     // ===== PASSO 2: Renderizar água com reflexão e transparência =====
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_FALSE); // Desabilita escrita no depth buffer para água transparente
+    
+    drawWaterPlane(false);
+    
+    glDepthMask(GL_TRUE); // Reabilita escrita no depth buffer
+    glDisable(GL_BLEND);
+    
+    glutSwapBuffers();
+}
+
+*/
+
+void display(){
+    // atualiza tempo
+    double currentTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+    deltaTime = (float)(currentTime - lastTime);
+    lastTime = currentTime;
+    waterTime = (float)currentTime;
+
+    // recalcula vetores
+    calculateDirectionVectors();
+    // atualiza nuvens
+    updateClouds(deltaTime);
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // ===== PASSO 1: Renderizar cena normal =====
+    glLoadIdentity();
+    gluLookAt(
+        cameraX, cameraY, cameraZ,
+        cameraX + directionX, cameraY + directionY, cameraZ + directionZ,
+        upVector[0], upVector[1], upVector[2]
+    );
+
+    // ===== PASSO 1: Renderizar reflexão das montanhas (espelhado) =====
+    glEnable(GL_CLIP_PLANE0);
+    
+    // Define plano de corte na altura da água
+    GLdouble clipPlane[] = {0.0, 1.0, 0.0, 20};
+    glClipPlane(GL_CLIP_PLANE0, clipPlane);
+    
+    glPushMatrix();
+    
+    // Espelha em Y (inverte verticalmente)
+    glScalef(1.0f, -1.0f, 1.0f);
+    
+    // Inverte o culling (porque espelhamos)
+    glCullFace(GL_FRONT);
+    
+    // Renderiza montanhas espelhadas com cor mais escura (simula reflexo)
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glDepthMask(GL_TRUE);
+    
+    renderMountains();
+    
+    glDisable(GL_BLEND);
+    glCullFace(GL_BACK); // Restaura culling
+    
+    glPopMatrix();
+    glDisable(GL_CLIP_PLANE0);
+
+    // ===== PASSO 2: Renderizar montanhas normais e nuvens =====
+    renderMountains();
+    renderClouds();
+
+    // ===== PASSO 3: Renderizar água com transparência =====
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glDepthMask(GL_FALSE); // Desabilita escrita no depth buffer para água transparente
